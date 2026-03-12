@@ -143,7 +143,7 @@ This tool is for **educational and research purposes only**. Always review a web
 
 **Madhav Tiwary**
 Python Developer | Web Scraping & Data Engineering
-- 📧 Tiwarymadhav.com
+- 📧 Tiwarymadhav.gmail.com
 - 💼 [[Upwork/Contra profile link]](https://www.upwork.com/freelancers/~01f57d319968afb3a8?mp_source=share)
 
 
