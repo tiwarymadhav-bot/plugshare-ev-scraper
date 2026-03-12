@@ -1,207 +1,203 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[codz]
-*$py.class
+import time
+import json
+import pandas as pd
 
-# C extensions
-*.so
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+# ==============================
+# CONFIG
+# ==============================
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+CSV_FILE = r"C:\Users\dell\Downloads\Location_IDs.csv"
+OUTPUT_JSON = r"C:\Users\dell\Downloads\plugshare_full_data.json"
+SAVE_INTERVAL = 20
+DRIVER_PATH = r"C:\Users\dell\Downloads\uc_driver_temp\chromedriver.exe"
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py.cover
-.hypothesis/
-.pytest_cache/
-cover/
 
-# Translations
-*.mo
-*.pot
+# ==============================
+# DRIVER SETUP
+# ==============================
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+chrome_options = Options()
+chrome_options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
 
-# Flask stuff:
-instance/
-.webassets-cache
+chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+chrome_options.add_argument("--disable-notifications")
+chrome_options.add_argument("--disable-geolocation")
+chrome_options.add_argument("--start-maximized")
 
-# Scrapy stuff:
-.scrapy
+service = Service(DRIVER_PATH)
+driver = webdriver.Chrome(service=service, options=chrome_options)
 
-# Sphinx documentation
-docs/_build/
 
-# PyBuilder
-.pybuilder/
-target/
+# ==============================
+# POPUP BYPASS
+# ==============================
 
-# Jupyter Notebook
-.ipynb_checkpoints
+def close_popup():
 
-# IPython
-profile_default/
-ipython_config.py
+    try:
+        close_btn = WebDriverWait(driver, 3).until(
+            EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Close']"))
+        )
+        close_btn.click()
+        return
+    except:
+        pass
 
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
+    try:
+        driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+        time.sleep(1)
+    except:
+        pass
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
+    driver.execute_script("""
+        document.querySelectorAll('[role="dialog"]').forEach(e => e.remove());
+        document.querySelectorAll('.ReactModal__Overlay').forEach(e => e.remove());
+        document.querySelectorAll('.ReactModalPortal').forEach(e => e.remove());
+        document.body.style.overflow = "auto";
+    """)
 
-# UV
-#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#uv.lock
 
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-#poetry.toml
+# ==============================
+# CLEAR OLD LOGS
+# ==============================
 
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#   pdm recommends including project-wide configuration in pdm.toml, but excluding .pdm-python.
-#   https://pdm-project.org/en/latest/usage/project/#working-with-version-control
-#pdm.lock
-#pdm.toml
-.pdm-python
-.pdm-build/
+def clear_logs():
+    driver.get_log("performance")
 
-# pixi
-#   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
-#pixi.lock
-#   Pixi creates a virtual environment in the .pixi directory, just like venv module creates one
-#   in the .venv directory. It is recommended not to include this directory in version control.
-.pixi
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
+# ==============================
+# GET FULL API JSON
+# ==============================
 
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
+def get_api_json(location_id):
 
-# SageMath parsed files
-*.sage.py
+    logs = driver.get_log("performance")
 
-# Environments
-.env
-.envrc
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+    for log in logs:
 
-# Spyder project settings
-.spyderproject
-.spyproject
+        message = json.loads(log["message"])["message"]
 
-# Rope project settings
-.ropeproject
+        if message["method"] == "Network.responseReceived":
 
-# mkdocs documentation
-/site
+            url = message["params"]["response"]["url"]
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+            if f"locations/{location_id}" in url:
 
-# Pyre type checker
-.pyre/
+                request_id = message["params"]["requestId"]
 
-# pytype static type analyzer
-.pytype/
+                try:
+                    body = driver.execute_cdp_cmd(
+                        "Network.getResponseBody",
+                        {"requestId": request_id}
+                    )
 
-# Cython debug symbols
-cython_debug/
+                    return json.loads(body["body"])
 
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+                except:
+                    pass
 
-# Abstra
-# Abstra is an AI-powered process automation framework.
-# Ignore directories containing user credentials, local state, and settings.
-# Learn more at https://abstra.io/docs
-.abstra/
+    return None
 
-# Visual Studio Code
-#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
-#  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
-#  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
 
-# Ruff stuff:
-.ruff_cache/
+# ==============================
+# SCRAPE FUNCTION
+# ==============================
 
-# PyPI configuration file
-.pypirc
+def scrape_location(location_id):
 
-# Cursor
-#  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
-#  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
-#  refer to https://docs.cursor.com/context/ignore-files
-.cursorignore
-.cursorindexingignore
+    url = f"https://www.plugshare.com/location/{location_id}"
+    print(f"Scraping → {location_id}")
 
-# Marimo
-marimo/_static/
-marimo/_lsp/
-__marimo__/
+    clear_logs()
+
+    driver.get(url)
+    time.sleep(4)
+
+    driver.execute_script(
+        'localStorage.setItem("ps_signup_prompt_seen", "true");'
+    )
+
+    time.sleep(3)
+
+    close_popup()
+
+    time.sleep(4)
+
+    data = get_api_json(location_id)
+
+    if isinstance(data, list):
+        data = data[0]
+
+    return data
+
+
+# ==============================
+# LOAD CSV
+# ==============================
+
+df = pd.read_csv(CSV_FILE)
+location_ids = df.iloc[:, 0].dropna().tolist()
+
+
+# ==============================
+# LOAD PREVIOUS DATA (Resume)
+# ==============================
+
+results = []
+
+try:
+    with open(OUTPUT_JSON, "r", encoding="utf-8") as f:
+        results = json.load(f)
+except:
+    results = []
+
+
+# ==============================
+# SCRAPING LOOP
+# ==============================
+
+counter = 0
+
+for loc_id in location_ids:
+
+    try:
+        data = scrape_location(loc_id)
+
+        if data:
+            results.append(data)
+            counter += 1
+
+    except Exception as e:
+        print(f"Error → {loc_id} : {e}")
+
+    # ⭐ SAVE EVERY 20 RECORDS
+    if counter >= SAVE_INTERVAL:
+
+        with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=4, ensure_ascii=False)
+
+        print("💾 Auto Saved 20 Records")
+        counter = 0
+
+    time.sleep(2)
+
+
+# ==============================
+# FINAL SAVE
+# ==============================
+
+with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
+    json.dump(results, f, indent=4, ensure_ascii=False)
+
+driver.quit()
+
+print("✅ Scraping Completed")
