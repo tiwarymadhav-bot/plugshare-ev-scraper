@@ -44,7 +44,7 @@ plugshare-scraper/
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/plugshare-ev-scraper.git
+git clone https://github.com/tiwarymadhav-bot/plugshare-ev-scraper.git
 cd plugshare-ev-scraper
 ```
 
